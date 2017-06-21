@@ -2,6 +2,7 @@ __author__ = 'rafael'
 
 from stratus import cirrus
 
+# Consumer module
 
 print(cirrus.create_vpc('MyVPC',
                        DryRun=False,
@@ -11,23 +12,23 @@ print(cirrus.create_vpc('MyVPC',
 
 print(cirrus.create_subnet('FrontEnd',
                           DryRun=False,
-                          VpcId='vpc-150aab70',
+                          VpcId='vpc-?',
                           CidrBlock='10.73.0.0/22'))
 
 print(cirrus.create_subnet('MidTear',
                           DryRun=False,
-                          VpcId='vpc-150aab70',
+                          VpcId='vpc-?',
 
                           CidrBlock='10.73.4.0/22'))
 
 print(cirrus.create_subnet('BackEnd',
                           DryRun=False,
-                          VpcId='vpc-150aab70',
+                          VpcId='vpc-?',
                           CidrBlock='10.73.8.0/22'))
 
 print(cirrus.create_subnet('DMZ',
                           DryRun=False,
-                          VpcId='vpc-150aab70',
+                          VpcId='vpc-?',
                           CidrBlock='10.73.12.0/24'))
 
 print(cirrus.create_dhcp_options('DHCP',

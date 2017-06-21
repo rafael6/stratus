@@ -3,6 +3,9 @@ __author__ = 'rafael'
 import boto3
 from botocore.exceptions import ClientError
 import json
+
+# Producer module
+
 # Automation for the life cycle of AWS network functions.
 
 # Create connection
