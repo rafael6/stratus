@@ -1,116 +1,166 @@
+#!/usr/bin/python3
 __author__ = 'rafael'
+__version__ = '0.0'
 
-from stratus import cirrus
-
-# Consumer module
-
-print(cirrus.create_vpc('MyVPC',
-                       DryRun=False,
-                       CidrBlock='10.73.0.0/20',
-                       InstanceTenancy='default',
-                       AmazonProvidedIpv6CidrBlock=False))
-
-print(cirrus.create_subnet('FrontEnd',
-                          DryRun=False,
-                          VpcId='vpc-?',
-                          CidrBlock='10.73.0.0/22'))
-
-print(cirrus.create_subnet('MidTear',
-                          DryRun=False,
-                          VpcId='vpc-?',
-
-                          CidrBlock='10.73.4.0/22'))
-
-print(cirrus.create_subnet('BackEnd',
-                          DryRun=False,
-                          VpcId='vpc-?',
-                          CidrBlock='10.73.8.0/22'))
-
-print(cirrus.create_subnet('DMZ',
-                          DryRun=False,
-                          VpcId='vpc-?',
-                          CidrBlock='10.73.12.0/24'))
-
-print(cirrus.create_dhcp_options('DHCP',
-                                DryRun=False,
-                                DhcpConfigurations=[
-                                    {
-                                        'Key': 'domain-name-servers',
-                                        'Values': ['10.10.0.1', '10.10.0.2']
-                                    }
-                                ]))
-
-print(cirrus.create_route_table('VPC_RTB', DryRun=False, VpcId='vpc-?'))
-
-print(cirrus.create_vpn_gateway('VPC_VGW', DryRun=False, Type='ipsec.1'))
-
-print(cirrus.attach_vpn_gateway(DryRun=False, VpnGatewayId='vgw-?', VpcId='vpc-?'))
-
-print(cirrus.create_customer_gateway('VPC_CGW',
-                                    DryRun=False,
-                                    Type='ipsec.1',
-                                    PublicIp='1.1.1.1',
-                                    BgpAsn=64601))
+# Compute and network
+from azure.common.credentials import ServicePrincipalCredentials
+from msrestazure.azure_cloud import AZURE_US_GOV_CLOUD
 
 
-print(cirrus.create_route(DryRun=False,
-                         RouteTableId='rtb-?',
-                         DestinationCidrBlock='0.0.0.0/0',
-                         GatewayId='vgw-6ae28249'))
+from azure.mgmt.compute import ComputeManagementClient
+from azure.mgmt.network import NetworkManagementClient
 
-print(cirrus.associate_route_table(DryRun=False, SubnetId='subnet-?', RouteTableId='rtb-?'))
-print(cirrus.associate_route_table(DryRun=False, SubnetId='subnet-?', RouteTableId='rtb-?'))
-print(cirrus.associate_route_table(DryRun=False, SubnetId='subnet-?', RouteTableId='rtb-?'))
-print(cirrus.associate_route_table(DryRun=False, SubnetId='subnet-?', RouteTableId='rtb-?'))
+from msrestazure import azure_exceptions
 
-print(cirrus.associate_dhcp_options(DryRun=False, DhcpOptionsId='dopt-?', VpcId='vpc-?'))
+# Cloud definitions:
+# AZURE_PUBLIC_CLOUD
+# AZURE_CHINA_CLOUD
+# AZURE_US_GOV_CLOUD
+# AZURE_GERMAN_CLOUD
 
+# Resource Group
+GROUP_NAME = 'Test_RG'
 
-print(cirrus.enable_vgw_route_propagation(RouteTableId='rtb-?', GatewayId='vgw-?'))
-
-# vpn-9ae888b9
-vpn_connection_name = 'VPC_VPN_CONN'
-connection_type = 'ipsec.1'
-customer_gateway_id = 'cgw-?'
-vpn_gateway_id = 'vgw-?'
-options = {'StaticRoutesOnly': False}
-print(cirrus.create_vpn_connection(vpn_connection_name,
-                                  DryRun=False,
-                                  Type=connection_type,
-                                  CustomerGatewayId=customer_gateway_id,
-                                  VpnGatewayId=vpn_gateway_id,
-                                  Options=options))
+# Network
+VNET_NAME = 'Test_VNet'
+SUBNET_NAME = 'Test_subnet'
 
 
-print(cirrus.create_network_acl('VPC_ACL', DryRun=False, VpcId='vpc-?'))
+# Tenant ID for Azure Subscription
+TENANT_ID = ''
+
+# Service Principal App ID
+CLIENT = ''
+
+# Service Principal Password
+KEY = ''
+
+credentials = ServicePrincipalCredentials(
+    client_id=CLIENT,
+    secret=KEY,
+    tenant=TENANT_ID,
+    cloud_environment=AZURE_US_GOV_CLOUD)
+
+# Subscription ID
+subscription_id = ''
+
+# Client example
+compute_client = ComputeManagementClient(credentials, subscription_id,
+                                         base_url=AZURE_US_GOV_CLOUD.endpoints.resource_manager)
+
+# Client example
+network_client = NetworkManagementClient(credentials, subscription_id,
+                                         base_url=AZURE_US_GOV_CLOUD.endpoints.resource_manager)
+
+# List VMs
+for vm in compute_client.virtual_machines.list_all():
+    print("\tVM: {}".format(vm.name))
+
+# Create Subnet
+try:
+    async_subnet_creation = network_client.subnets.create_or_update(
+        GROUP_NAME,
+        VNET_NAME,
+        SUBNET_NAME,
+        {'address_prefix': '10.70.76.0/24'}
+    )
+
+except azure_exceptions.CloudError as e:
+    print(e.response.content)
+
+subnet_info = async_subnet_creation.result()
+
+print(subnet_info)
+
+###############################################################################
+# Create a resource group and list all resource groups
+from azure.mgmt.resource import ResourceManagementClient
+
+# Create client
+client = ResourceManagementClient(credentials, subscription_id)
+
+# Create resource group
+RESOURCE_GROUP_NAME = 'My_resource_group'
 
 
-print(cirrus.create_network_acl_entry(DryRun=False,
-                                     NetworkAclId='acl-',
-                                     RuleNumber=100,
-                                     Protocol='udp',
-                                     RuleAction='allow',
-                                     Egress=False,
-                                     CidrBlock='0.0.0.0/0',
-                                     PortRange={
-                                         'From': 123,
-                                         'To': 123
-                                     }))
+client.resource_groups.create(RESOURCE_GROUP_NAME, {'location':'eastus'})
 
+# Lists resource groups
+resource_groups = client.resource_groups.list()
+for group in resource_groups:
+    print(group.name)
 
-print(cirrus.replace_network_acl_entry(CidrBlock='1.1.1.1/24',
-                                      Egress=False,
-                                      NetworkAclId='acl-?',
-                                      PortRange={
-                                          'From': 53,
-                                          'To': 53,
-                                      },
-                                      Protocol='udp',
-                                      RuleAction='allow',
-                                      RuleNumber=110,))
+###############################################################################
+# Create deployment from template
 
+from azure.mgmt.resource.resources.models import Deployment
+from azure.mgmt.resource.resources.models import DeploymentProperties
+from azure.mgmt.resource.resources.models import DeploymentMode
+from azure.mgmt.resource import ResourceManagementClient
 
-print(cirrus.replace_network_acl_association(DryRun=False,
-                                            AssociationId='aclassoc-?',
-                                            NetworkAclId='acl-?'))
+deployment_name = 'MyDeployment'
 
+template = {
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "allowedValues": [
+        "East US",
+        "West US",
+        "West Europe",
+        "East Asia",
+        "South East Asia"
+      ],
+      "metadata": {
+        "description": "Location to deploy to"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "availabilitySet1",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[parameters('location')]",
+      "properties": {}
+    }
+  ]
+}
+
+# Note: when specifying values for parameters, omit the outer elements $schema, contentVersion, parameters
+parameters = {"location": { "value": "West US"}}
+
+# Tenant ID for Azure Subscription
+TENANT_ID = ''
+
+# Service Principal App ID
+CLIENT = ''
+
+# Service Principal Password
+KEY = ''
+
+credentials = ServicePrincipalCredentials(
+    client_id=CLIENT,
+    secret=KEY,
+    tenant=TENANT_ID,
+    cloud_environment=AZURE_US_GOV_CLOUD)
+
+# Subscription ID
+subscription_id = ''
+
+# Resource group
+group_name = 'My_RG'
+
+resource_client = ResourceManagementClient(credentials, subscription_id)  # Added by RGM
+
+result = resource_client.deployments.create_or_update(
+    group_name,
+    deployment_name,
+    properties=DeploymentProperties(
+        mode=DeploymentMode.incremental,
+        template=template,
+        parameters=parameters,
+    )
+)

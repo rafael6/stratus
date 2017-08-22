@@ -1,8 +1,10 @@
-__author__ = 'rafael'
-
+#!/usr/bin/python3
 import boto3
 from botocore.exceptions import ClientError
 import json
+
+__author__ = 'rafael'
+__version__ = '1'
 
 # Producer module
 
@@ -133,123 +135,142 @@ def delete_vpc(**kwargs):
 
 
 ########## SUBNET ##########
-def describe_subnets(**kwargs):
-    '''
+#v2
+def describe_subnets(filters=None, dry_run=False):
+    """
     Describes one or more of your subnets.
-    :param kwargs:
+    The default (no parameters) is to describes all subnets.
+
+    Usage:
+        response = describe_subnets(
+            filters=[{'Name': 'vpc-id', 'Values': ['vpc-a01106c2']}]))
+        print(response)
+
+    :param filters: One or more filters (list)
+        Some common filters:
+            {'Name': 'vpc-id', 'Values': ['vpc-a01106c2']}
+            {'Name': 'subnet-id', 'Values': ['subnet-efb8c398']}
+            {'Name': 'cidrBlock', 'Values': ['10.73.0.0/22']}
+            {'Name': 'tag-value', 'Values': ['EIT_Prod']}
+
+    :param dry_run: Checks required permissions for the action (bol).
     :return:
-    '''
+    """
     try:
-        if 'Filters' in kwargs:
-            response = client.describe_subnets(
-                DryRun=kwargs['DryRun'],
-                Filters=kwargs['Filters']
-            )
-        elif 'SubnetIds' in kwargs:
-            response = client.describe_subnets(
-                DryRun=kwargs['DryRun'],
-                SubnetIds=kwargs['SubnetIds']
-            )
+        if filters:
+            response = client.describe_subnets(Filters=filters, DryRun=dry_run)
+        elif not filters:
+            response = client.describe_subnets(SubnetIds=[], DryRun=dry_run)
         else:
             print('Something went wrong.')
         return response
     except ClientError as e:
         print(e)
 
+#v2
+def create_subnet(vpc_id, cidr_block,
+                  availability_zone='default',
+                  subnet_name=None,
+                  dry_run=False):
+    """
+    Creates a subnet in an existing VPC.
 
-def create_subnet(subnet_name, **kwargs):
-    '''
+    Usage:
+    response = create_subnet('vpc-?', '10.0.0.0/24',
+                  availability_zone='default',
+                  subnet_name=None,
+                  dry_run=False):
 
-    :param subnet_name:
-    :param kwargs:
+    :param vpc_id: The ID of the VPC (str).
+    :param cidr_block: Subnet in CIDR notation (str).
+    :param availability_zone: Availability Zone for the subnet (str).
+    :param subnet_name: Name for subnet (str).
+    :param dry_run: Checks whether you have the required permissions (bol).
     :return:
-        DryRun=True|False,
-        VpcId='string',
-        CidrBlock='string',
-        Ipv6CidrBlock='string',
-        AvailabilityZone='string'
-    '''
+    """
     try:
-        if 'AvailabilityZone' in kwargs:
+        if 'AvailabilityZone' is not 'default':
             response = client.create_subnet(
-                DryRun=kwargs['DryRun'],
-                VpcId=kwargs['VpcId'],
-                CidrBlock=kwargs['CidrBlock'],
-                AvailabilityZone=kwargs['AvailabilityZone']
+                DryRun=dry_run,
+                VpcId=vpc_id,
+                CidrBlock=cidr_block,
+                AvailabilityZone=availability_zone
             )
         else:
             response = client.create_subnet(
-                DryRun=kwargs['DryRun'],
-                VpcId=kwargs['VpcId'],
-                CidrBlock=kwargs['CidrBlock']
+                DryRun=dry_run,
+                VpcId=vpc_id,
+                CidrBlock=cidr_block
             )
 
         subnet = response.get('Subnet', 'Key not found')
         vpc_id = subnet.get('VpcId', 'Key not found')
         cidr_block = subnet.get('CidrBlock', 'Key not found')
         subnet_id = subnet.get('SubnetId', 'Key not found')
-        create_tags(DryRun=False,
-                    Resources=[
-                        subnet_id,
-                    ],
-                    Tags=[
-                        {
-                            'Key': 'Name',
-                            'Value': subnet_name,
-                        },
-                    ],
-                    )
+        if subnet_name is not None:
+            create_tags(DryRun=False,
+                        Resources=[
+                            subnet_id,
+                        ],
+                        Tags=[
+                            {
+                                'Key': 'Name',
+                                'Value': subnet_name,
+                            },
+                        ],
+                        )
         return response
     except ClientError as e:
         print(e)
 
+#v2
+def modify_subnet_attribute(subnet_attribute, subnet_id):
+    """
+    Modifies a subnet attribute. You can only modify one attribute at a time.
 
-def modify_subnet_attribute(**kwargs):
-    '''
-    Modifies a subnet attribute:
-        MapPublicIpOnLaunch (dict) Specify true to indicate that network
-        interfaces created in the specified subnet should be assigned a public
-        IPv4 address.
+    Usage:
+    response = modify_subnet_attribute(
+        MapPublicIpOnLaunch={'Value': True},
+        subnet_id='subnet-abc123')
 
-        AssignIpv6AddressOnCreation (dict) Specify true to indicate that network
-        interfaces created in the specified subnet should be assigned an IPv6
-        address.
+    print(response)
 
-    :param kwargs:
-        SubnetId='string',
-        MapPublicIpOnLaunch={'Value': True|False}
-        AssignIpv6AddressOnCreation={'Value': True|False}
-    :return:
-    '''
+    :param subnet_attribute:
+        AssignIpv6AddressOnCreation (dict):
+        Specify true to indicate that network interfaces created in the
+        specified subnet should be assigned an IPv6 address.
+        Example, AssignIpv6AddressOnCreation={'Value': True|False}
+
+        MapPublicIpOnLaunch (dict):
+        Specify true to indicate that network interfaces created in the
+        specified subnet should be assigned a public IPv4 address.
+        Example, MapPublicIpOnLaunch={'Value': True|False}
+    :param subnet_id: The ID of the subnet (str). Example, 'subnet-1a2b3c4d'
+    :return: None
+    """
     try:
-        if 'AssignIpv6AddressOnCreation' in kwargs:
-            response = client.modify_subnet_attribute(
-                SubnetId='string',
-                MapPublicIpOnLaunch=kwargs['MapPublicOnLaunch'],
-                AssignIpv6AddressOnCreation=kwargs['AssignIpv6AddressOnCreation']
-            )
-        else:
-            response = client.modify_subnet_attribute(
-                SubnetId=kwargs['SubnetId'],
-                MapPublicIpOnLaunch=kwargs['MapPublicOnLaunch']
-            )
+        response = client.modify_subnet_attribute(subnet_attribute, SubnetId=subnet_id)
         return response
     except ClientError as e:
         print(e)
 
-
-def delete_subnet(**kwargs):
-    '''
+#v2
+def delete_subnet(subnet_id, dry_run=False):
+    """
     Deletes the specified subnet.
-    :param kwargs:
-        DryRun=True|False,
-        SubnetId='string'
+
+    Usage:
+        response = client.delete_subnet('subnet-?')
+        print(response)
+
+    :param subnet_id: The id of the subnet (str).
+    :param dry_run: Checks required permissions for the action (bol).
     :return:
-    '''
+    """
     try:
         response = client.delete_subnet(
-            DryRun=kwargs['DryRun'],
-            SubnetId=kwargs['SubnetId']
+            DryRun=dry_run,
+            SubnetId=subnet_id
         )
         return response
     except ClientError as e:
@@ -1576,6 +1597,7 @@ def create_tags(**kwargs):
 
 
 def main():
+
     exit()
     ########## VPC ##########
     print(describe_vpcs(DryRun=False, VpcIds=['vpc-0eb7696b']))
@@ -1607,39 +1629,14 @@ def main():
     print(delete_vpc(DryRun=False, VpcId='vpc-76a90813'))
 
     ########## SUBNETS ##########
-    print(describe_subnets(DryRun=False,
-                     Filters=[
-                         {
-                             'Name': 'vpc-id',
-                             'Values': [
-                                 'vpc-1c218479',
-                             ],
-                         },
-                     ],
-                     )
-          )
-    # OR
-    print(describe_subnets(DryRun=False, SubnetIds=['string',]))
+    print(describe_subnets(filters=[{'Name': 'tag-value', 'Values': ['EIT_Prod']}], dry_run=False))
+    print(describe_subnets())
 
-    print(create_subnet('Test_Subnet',
-                        DryRun=False,
-                        VpcId='?',
-                        CidrBlock='10.73.0.0/22'
-                        )
-          )
+    print(create_subnet('vpc-?', '10.0.0.0/24', subnet_name='MySubnetName'))
 
-    print(modify_subnet_attribute(SubnetId='string',
-                                  MapPublicIpOnLaunch={
-                                      'Value': False
-                                  },
-                                  AssignIpv6AddressOnCreation={
-                                      'Value': False
-                                  }
-                                  )
-          )
+    print(modify_subnet_attribute(MapPublicIpOnLaunch={'Value': False}, subnet_id='subnet-abc123'))
 
-
-    print(delete_subnet(DryRun=False, SubnetId='?'))
+    print(delete_subnet('subnet-?'))
 
     ########## DHCP OPTIONS ##########
     print(describe_dhcp_options(DryRun=False, DhcpOptionsIds=['dopt-?',]))
@@ -1910,6 +1907,6 @@ def main():
     print(delete_vpc_peering_connection(DryRun=False, VpcPeeringConnectionId='string'))
 
 
-if __name__ == "__main__":
-    main()
+
+
 
