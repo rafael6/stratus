@@ -2,6 +2,7 @@
 __author__ = 'rafael'
 __version__ = '0.0'
 
+
 # Compute and network
 from azure.common.credentials import ServicePrincipalCredentials
 from msrestazure.azure_cloud import AZURE_US_GOV_CLOUD
@@ -164,3 +165,5 @@ result = resource_client.deployments.create_or_update(
         parameters=parameters,
     )
 )
+
+
