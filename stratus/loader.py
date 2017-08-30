@@ -89,6 +89,7 @@ class Loader:
 
         #deployment_async_operation = self.client.deployment_operations.create_or_update()
         #self.client.deployments.create_or_update()
+
         deployment_async_operation = self.client.deployments.create_or_update(
             self.resource_group,
             '{} {}'.format(self.resource_group, datetime.datetime.now()),
