@@ -1,4 +1,6 @@
+#!/usr/bin/python3
 __author__ = 'rafael'
+__version__ = '0.2'
 
 """Creates resource group if necessary, loads json, and delete json if necessary."""
 
@@ -13,8 +15,10 @@ from msrestazure.azure_cloud import AZURE_US_GOV_CLOUD
 
 class Loader:
     """
-
+    Initialize the Loader class with a Resource Management Client
+    with Service Principal credentials
     """
+
     def __init__(
             self,
             cloud_definition,
@@ -26,7 +30,6 @@ class Loader:
             secret,
             template_name
     ):
-
         self.cloud_definition = cloud_definition
         self.tenant = tenant
         self.location = location
@@ -40,7 +43,7 @@ class Loader:
         self.base_url = None
 
         if self.cloud_definition == 'azure_gov':
-            self.cloud_definition == AZURE_US_GOV_CLOUD
+            self.cloud_definition = AZURE_US_GOV_CLOUD
             self.base_url = AZURE_US_GOV_CLOUD.endpoints.resource_manager
 
         self.credentials = ServicePrincipalCredentials(
@@ -58,7 +61,6 @@ class Loader:
 
     def create_resource_group(self):
         """Create resource group"""
-        #result = self.client.resource_groups.create()
         result = self.client.resource_groups.create_or_update(
             self.resource_group,
             {
@@ -69,11 +71,11 @@ class Loader:
 
     def get_template(self):
         try:
-            template_path = os.path.join(os.path.dirname(__file__), 'templates', self.template_name)
+            template_path = os.path.join(os.path.dirname(__file__), "Templates", self.template_name)
             with open(template_path, 'r') as template_file_fd:
                 template = json.load(template_file_fd)
         except IOError:
-            print("An IOError has occurred!")
+            print("An IOError has occurred!" + template_path)
         self.template = template
         return self.template
 
@@ -87,31 +89,38 @@ class Loader:
             'template': self.get_template()
         }
 
-        #deployment_async_operation = self.client.deployment_operations.create_or_update()
-        #self.client.deployments.create_or_update()
+        # deployment_async_operation = self.client.deployment_operations.create_or_update()
+        # self.client.deployments.create_or_update()
 
         deployment_async_operation = self.client.deployments.create_or_update(
             self.resource_group,
-            '{} {}'.format(self.resource_group, datetime.datetime.now()),
+            '{}_{}'.format(self.resource_group, datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')),
             deployment_properties
         )
 
         deployment_async_operation.wait()
 
-    def destroy(self):
-        """Destroy the given resource group"""
-        self.client.resource_groups.delete(self.resource_group)
+        # def destroy(self):
+        #     """Destroy the given resource group"""
+        #     self.client.resource_groups.delete(self.resource_group)
 
 
 def main():
-    cloud_definition = 'azure_gov'
+    cloud_definition = ''
     tenant = ''
     location = ''
     subscription_id = ''
     resource_group = ''
-    chq_test_sp = ''
+    chq_dr_test_sp = ''
     secret = ''
+
     template_name = ''
+
+    loader_object = Loader(cloud_definition, tenant, location, subscription_id,
+                           resource_group, chq_dr_test_sp, secret, template_name)
+
+    loader_object.deploy()
+
 
 if __name__ == '__main__':
     main()
