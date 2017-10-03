@@ -1,8 +1,29 @@
 #!/usr/bin/python3
 __author__ = 'rafael'
-__version__ = '0.4'
+__version__ = '1.0'
 
-"""Creates resource group if necessary, loads json, and delete json if necessary."""
+"""
+Creates resource group if necessary, deploy json template, and optionally
+destroys the resource group and its content.
+
+Usage:
+    from stratus import loader
+
+    cloud_definition = 'azure_com'
+    tenant = 'my_tenant_id'
+    location = 'my_location'
+    subscription_id = 'my_subscription_id'
+    resource_group = 'my_resource_group'
+    service_principal = 'my_service_pricipal'
+    sp_key = 'my_service_pricipla_key'
+    template_name = "my_json.json"
+
+    load = loader.Loader(cloud_definition, tenant, location, subscription_id,
+                               resource_group, service_principal, sp_key, template_name)
+    load.deploy()
+    print(load)
+    load.destroy()
+"""
 
 import datetime
 import os.path
@@ -16,13 +37,30 @@ from msrestazure.azure_cloud import AZURE_PUBLIC_CLOUD
 from msrestazure import azure_exceptions
 from msrest.exceptions import AuthenticationError
 
-# TODO:
-
 
 class Loader:
     """
-    Initialize the Loader class with a Resource Management Client
-    with Service Principal credentials
+    Initialize the Loader class with a Resource Management Client.
+
+    Args:
+        cloud_definition (str): Cloud definition such as azure_gov or azure_com
+        tenant (str): The tenant ID.
+        location (str): The resource's location
+        subscription_id (str): The subscription ID.
+        resource_group (str): The resource group.
+        service_principal (str): The service principal ID.
+        secret (str): The service principal ID.
+        template_name (str): The name of the template.
+        parameters_values (dic): The parameters; default value is None.
+
+    Attributes:
+        template (dict): The JSON document; default is None.
+        base_url (str): The base URL object; default is None.
+        credentials (ServicePrincipalCredentials): Credential; default is None.
+        client (ResourceManagementClient): The Client object; default is None.
+        resource_group_output (ResourceGroup): Default is None.
+        deployment_output (DeploymentExtended): Default value is None.
+        parameters = (dict): parameters as a dictionary; default value is None.
     """
 
     def __init__(
@@ -70,11 +108,13 @@ class Loader:
                 tenant=self.tenant,
                 cloud_environment=self.cloud_definition
             )
+
             self.client = ResourceManagementClient(
                 self.credentials,
                 self.subscription_id,
                 base_url=self.base_url
             )
+
         except AuthenticationError as e:
             print(e)
             sys.exit(1)
@@ -83,6 +123,10 @@ class Loader:
             sys.exit(1)
 
     def __str__(self):
+        """
+        A custom string representation of the object.
+        :return: (str)
+        """
         try:
             output = '''Deployment details:
         Resource Group Name: {}
@@ -102,7 +146,11 @@ class Loader:
             sys.exit(1)
 
     def create_resource_group(self):
-        """Create resource group"""
+        """
+        Create resource group for the deployment if the resource group doesn't
+        exists.
+        :return: (ResourceGroup)
+        """
         try:
             result = self.client.resource_groups.create_or_update(
                 self.resource_group,
@@ -116,6 +164,12 @@ class Loader:
             print(e)
 
     def get_template(self):
+        """
+        Opens the specified json file from the templates directory and
+        serialize it into a dict object.
+
+        :return: (dict), serialized json.
+        """
         try:
             template_path = os.path.join(
                 os.path.dirname(__file__),
@@ -130,23 +184,40 @@ class Loader:
                 template_path, self.template_name))
 
     def get_parameters(self):
+        """
+        Creates parameters for an Azure resource from a given dictionary object.
+        :return: (dict)
+        """
         if self.parameters_values:
             self.parameters = {k: {'value': v} for k, v in self.parameters_values.items()}
         else:
             self.parameters = {}
+        return self.parameters
 
     @staticmethod
     def get_timestamp():
-            now = datetime.datetime.now()
-            timestamp = '{}-{}-{}_{}.{}.{}'.format(now.year, now.month, now.day,
-                                                   now.hour, now.minute, now.second)
-            return timestamp
+        """
+        Create a timestamp used to create a unique name for the deployment.
+
+        :return: (str), timestamp in the form of YYYY-MM-DD_HH.MM.SS
+        """
+
+        now = datetime.datetime.now()
+        timestamp = '{}-{}-{}_{}.{}.{}'.format(now.year, now.month, now.day,
+                                               now.hour, now.minute, now.second)
+        return timestamp
 
     def deploy(self):
-        """Deploy template"""
+        """
+        Deploys the template using the specified deployment properties and
+        prints the name of the deployment from the name property of the
+        deployment output.
+        :return: (None)
+        """
 
         self.create_resource_group()
         try:
+            print('get_para: ', self.get_parameters())
             deployment_properties = {
                 'mode': DeploymentMode.incremental,
                 'template': self.get_template(),
@@ -164,7 +235,11 @@ class Loader:
             print(e)
 
     def destroy(self):
-        """Destroy the given resource group"""
+        """
+        Destroy the specified resource group.
+
+        :return: (None)
+        """
         try:
             self.client.resource_groups.delete(self.resource_group)
         except azure_exceptions.CloudError as e:

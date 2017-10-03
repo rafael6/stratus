@@ -68,21 +68,21 @@ def create_update_vnet(
             parameters,
             custom_headers=None,
             raw=False)
-        async_vnet_creation.wait() #!!!
-        vnet_info = async_vnet_creation.result() #!!!
-        return vnet_info # !!!
+        async_vnet_creation.wait()  # !!!
+        vnet_info = async_vnet_creation.result()  # !!!
+        return vnet_info.result().provisioning_state  # !!!
     except azure_exceptions.CloudError as e:
-        print('DEBUG-1', e)
-        print('DEBUG-2', e.response.content)
-        return e.response.content
+        return e
 
-
+network_client.subnets.create_or_update('rg', 'vn', 'su', {})
 def main():
 
     create_update_vnet(
         'my_rg',
         'my_vnet',
-        {'location': 'my_location', 'address_space': {'address_prefixes': ['10.0.0.0/16']}}
+        {'location': 'my_location',
+         'address_space': {'address_prefixes': ['10.0.0.0/16']},
+         'dhcp_options': {'dns_servers': ['8.8.8.8', '8.8.8.8']}}
     )
 
 if __name__ == '__main__':
